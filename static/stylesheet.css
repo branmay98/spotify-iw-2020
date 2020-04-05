@@ -1,0 +1,33 @@
+.d3-tip {
+    line-height: 1;
+    font-weight: 400;
+    padding: 12px;
+    color: #fff;
+    border-radius: 2px;
+    font-family: 'Circular', Arial, Helvetica, sans-serif;
+}
+#chart {
+    position: fixed;
+    left: 0px;
+    right: 0px;
+    top: 0px;
+    bottom: 0px;
+}
+@font-face{
+    font-family: 'Circular';
+    src: url('fonts/circular-book.woff2');
+    font-weight: 400;
+}
+@font-face {
+    font-family: 'Circular';
+    src: url('fonts/circular-black.woff2');
+    font-weight: 900;
+}
+@font-face{
+    font-family: 'Circular';
+    src: url('fonts/circular-bold.woff2');
+    font-weight: 700;
+}
+body {
+    font-family: 'Circular';
+}
