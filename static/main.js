@@ -117,6 +117,7 @@ let all_artists_top_tracks = null
 let song_locked = false
 let current_artist = null
 let current_track = null
+let current_link = null
 
 
 function chooseDirection(x, y) { 
@@ -229,6 +230,7 @@ var results = d3.json("/top_genres", {method:"POST"}).then( results => {
     })
     .on('click', function (d) {
       d3.event.stopPropagation(); 
+      if (d3.event.defaultPrevented) return; // dragged
       if (sim_end) {
         if (focused !== d) {
           d3.select(this).transition().duration(duration_stroke_transition_zoom).style("stroke-width",0);
@@ -258,7 +260,10 @@ var results = d3.json("/top_genres", {method:"POST"}).then( results => {
         d3.select(this).style("stroke-width",0);
         tip_node.hide(d)
       }
-    })
+    }).call(d3.drag()
+    .on("start", dragstarted)
+    .on("drag", dragged)
+    .on("end", dragended));
   // // console.log(circles)
 
   let labels_group = svg.append("g")
@@ -293,10 +298,15 @@ var results = d3.json("/top_genres", {method:"POST"}).then( results => {
               }
             })
             
-  let current_track_text = lock_group.append("text").attr("y", height-150).attr("x", width-225).attr("font-size", 32)
+  let current_track_text = lock_group.append("text").attr("y", height-150).attr("x", width-225).attr("font-size", 36)
   .attr("text-anchor", "end")
-  let current_artist_text = lock_group.append("text").attr("y", height-75).attr("x", width-225).attr("font-size", 24)
+  let current_artist_text = lock_group.append("text").attr("y", height-100).attr("x", width-225).attr("font-size", 24)
   .attr("text-anchor", "end")
+  let current_track_link = lock_group.append("a").attr("target", "_blank").on('click', () => d3.event.stopPropagation())
+  current_track_link.append("text").attr("y", height-60).attr("x", width-225).attr("font-size", 16).style("fill", "333")
+  .attr("text-anchor", "end")
+  .on('mouseover', function() {d3.select(this).style("fill","000")})
+  .on('mouseout', function() {d3.select(this).style("fill","333")})
 
   let now_playing_group = svg.append("g")
   let mask = now_playing_group.append('mask').attr("id", "maskurl")
@@ -415,6 +425,23 @@ var results = d3.json("/top_genres", {method:"POST"}).then( results => {
     `)
     
   }
+  
+  function dragstarted(d) {
+    d.fx = d.x;
+    d.fy = d.y;
+  }
+  
+  function dragged(d) {
+    sim.alphaTarget(0.3).restart();
+    d.fx = d3.event.x;
+    d.fy = d3.event.y;
+  }
+  
+  function dragended(d) {
+    if (!d3.event.active) sim.alphaTarget(0);
+    d.fx = null;
+    d.fy = null;
+  }
 
   function song_lock_toggle() {
     song_locked = !song_locked
@@ -427,9 +454,12 @@ var results = d3.json("/top_genres", {method:"POST"}).then( results => {
     if (song_locked) {
       current_track_text.text(current_track)
       current_artist_text.text(current_artist)
+      current_track_link.select("text").text("Click to open in Spotify")
+      current_track_link.attr("xlink:href", current_link)
     } else {
       current_track_text.text("")
       current_artist_text.text("")
+      current_track_link.select("text").text("")
     }
   }
 
@@ -472,6 +502,7 @@ var results = d3.json("/top_genres", {method:"POST"}).then( results => {
             audio.addEventListener('ended', function(d) { 
               current_artist = null
               current_track = null
+              current_link = null
               if (song_locked) {
                 song_lock_toggle(); 
               }
@@ -490,6 +521,7 @@ var results = d3.json("/top_genres", {method:"POST"}).then( results => {
             rect_moving.transition().ease(d3.easeLinear).duration(30000).attr("width", bb.width)
             current_artist = d.name
             current_track = rand_track.name
+            current_link = rand_track.link
 
 
 
@@ -523,9 +555,13 @@ var results = d3.json("/top_genres", {method:"POST"}).then( results => {
             artist_names_group.selectAll("text").style("fill-opacity", 0.8)
             current_track = null
             current_artist = null
+            current_link = null
           }
         })
-        .on("click", function(d) { song_lock_toggle(); d3.event.stopPropagation() })
+        .on("click", function(d, i) { 
+          d3.event.stopPropagation();
+          if (i < num_listed_artists) {song_lock_toggle(); }
+        })
         .style("display", "none")
         .style("fill-opacity", 0)
       }

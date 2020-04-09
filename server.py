@@ -8,6 +8,7 @@ from collections import defaultdict
 import json
 import random
 from spotipy import oauth2
+from flask.helpers import send_from_directory
 
 app = Flask(__name__)
 
@@ -66,7 +67,7 @@ def all_artists_top_tracks():
     all_artist_uri = {}
     for artist, uri in artist_dict.items():
         top_tracks = sp.artist_top_tracks(uri)
-        tracks = [{"uri": track["preview_url"], "name": track["name"]} for track in top_tracks["tracks"]]
+        tracks = [{"uri": track["preview_url"], "name": track["name"], "link": track["external_urls"]["spotify"]} for track in top_tracks["tracks"]]
         all_artist_uri[artist] = tracks
     
     print("done")
@@ -131,6 +132,11 @@ def callback():
     print(f"Made session for {sp.me()['id']}")
 
     return redirect('/main')
+
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(os.path.join(app.root_path, 'static'),
+                               'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
 class Session():
 
