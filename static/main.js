@@ -113,6 +113,10 @@ let sim_end = false
 let expanding = false
 let audio = null
 let artists_visible = false
+let all_artists_top_tracks = null
+let song_locked = false
+let current_artist = null
+let current_track = null
 
 
 function chooseDirection(x, y) { 
@@ -162,6 +166,13 @@ function chooseDirection(x, y) {
 }
 
 var results = d3.json("/top_genres", {method:"POST"}).then( results => {
+  
+  d3.json("/all_artists_top_tracks", {method:"POST"}).then( function(d) {
+    all_artists_top_tracks = d
+  })
+
+  
+
   var nodes = results.nodes.map(d => {
     return {
       genre: d.genre, artists: d.artists, radius: d.artists.length**exp_radius_circle+const_radius_circle
@@ -259,12 +270,40 @@ var results = d3.json("/top_genres", {method:"POST"}).then( results => {
 
   let artist_names_group = svg.append("g")
 
+  
+  let lock_group = svg.append("g")
+  let unlocked = lock_group.append("svg:image")
+            .attr("xlink:href", "static/unlocked.svg").attr("y", height-200)
+            .attr("x", width-200).style("display", "inline").style("opacity", 0.2)
+  let locked = lock_group.append("svg:image")
+            .attr("xlink:href", "static/locked.svg").attr("y", height-200)
+            .attr("x", width-200).style("display", "none").style("opacity", 0.7)
+            .on('mouseover', function() {
+              d3.select(this).style("opacity",0)
+              unlocked.style("opacity", 0.8).style("display", "inline")
+            })
+            .on('click', function () {
+              d3.event.stopPropagation()
+              song_lock_toggle()
+            })
+            .on('mouseout', function() {
+              if (song_locked) {
+                d3.select(this).style("opacity",0.7)
+                unlocked.style("opacity", 0).style("display", "none")
+              }
+            })
+            
+  let current_track_text = lock_group.append("text").attr("y", height-150).attr("x", width-225).attr("font-size", 32)
+  .attr("text-anchor", "end")
+  let current_artist_text = lock_group.append("text").attr("y", height-75).attr("x", width-225).attr("font-size", 24)
+  .attr("text-anchor", "end")
+
   let now_playing_group = svg.append("g")
   let mask = now_playing_group.append('mask').attr("id", "maskurl")
   let test_masked = now_playing_group.append("g").style("mask", "url(#maskurl)")
   var now_playing = mask.append("text").style("font-weight", 400).style("fill", "white")
-  let rect_bg = test_masked.append("rect").style("fill", "444")
-  let rect_moving = test_masked.append("rect").style("fill", "000")
+  let rect_bg = test_masked.append("rect").style("fill", "333").style("fill-opacity", 0.5)
+  let rect_moving = test_masked.append("rect").style("fill", "000").style("fill-opacity", 0.5)
 
   // let now_playing_group = svg.append("g")
   // var now_playing = now_playing_group.append("text").style("display", "none").style("font-weight", 400)
@@ -377,10 +416,29 @@ var results = d3.json("/top_genres", {method:"POST"}).then( results => {
     
   }
 
+  function song_lock_toggle() {
+    song_locked = !song_locked
+    unlocked.style("display", () => song_locked ? "none" : "inline").style("opacity", 0.2).raise()
+    locked.style("display", () => song_locked ? "inline" : "none").style("opacity", 0.7).raise()
+    update_player()
+  }
+
+  function update_player() {
+    if (song_locked) {
+      current_track_text.text(current_track)
+      current_artist_text.text(current_artist)
+    } else {
+      current_track_text.text("")
+      current_artist_text.text("")
+    }
+  }
+
   function zoom(isBackground, orig_d) {
     var next
     focused_0 = focused
     focused = orig_d
+
+    now_playing.style("display", "none")
     // if (artists_visible) {
     //   // transition off
     //   artist_names_group.transition().duration(500)
@@ -394,7 +452,6 @@ var results = d3.json("/top_genres", {method:"POST"}).then( results => {
     } else {
       next = [orig_d.x, orig_d.y, orig_d.radius*mult_zoom_radius_view]
       if (focused !== focused_0){
-        console.log(orig_d.artists)
         if (orig_d.artists.length > num_listed_artists) {
           name_data = d3.shuffle(orig_d.artists).slice(0,num_listed_artists).concat(`and ${orig_d.artists.length-num_listed_artists} more...`)
         }
@@ -407,35 +464,68 @@ var results = d3.json("/top_genres", {method:"POST"}).then( results => {
         .attr("font-size", (_, i) => i === num_listed_artists ? orig_d.radius/15 : orig_d.radius/12).attr("font-weight", (_, i) => i === num_listed_artists ? 400 : 700)
         .attr("text-anchor", "end")
         .on("mouseover", function (d, i) {
-          if (i < num_listed_artists) {
-            d3.json('/artist_top_tracks', {
-              method: "POST", 
-              headers: {'Content-Type': 'application/json'}, 
-              body:JSON.stringify({artist:d.name})}
-            ).then(results => {
+          if (i < num_listed_artists & (!song_locked)) {
+            d3.select(this).style("fill-opacity", 1)
             if (audio) {audio.pause()}
-            
-            audio = new Audio(results.uri)
-            audio.volume = 0.1
+            rand_track = all_artists_top_tracks[d.name][Math.floor(Math.random()*10)]
+            audio = new Audio(rand_track.uri)
+            audio.addEventListener('ended', function(d) { 
+              current_artist = null
+              current_track = null
+              if (song_locked) {
+                song_lock_toggle(); 
+              }
+              now_playing.style("display", "none");
+            })
+            audio.volume = 0.2
             audio.play()
+
             now_playing.style("font-size", orig_d.radius/15).attr("y", orig_d.y+orig_d.radius*0.12*(i-2.5-0.02))
             .attr("x", orig_d.x+orig_d.radius/50)
-            .style("display", "inline").text(results.name)
+            .style("display", "inline").text(rand_track.name)
+
             var bb = now_playing.node().getBBox()
             rect_bg.attr("x", bb.x).attr("y", bb.y).attr("width", bb.width).attr("height", bb.height)
             rect_moving.attr("x", bb.x).attr("y", bb.y).attr("width", 0).attr("height", bb.height)
             rect_moving.transition().ease(d3.easeLinear).duration(30000).attr("width", bb.width)
-          })
+            current_artist = d.name
+            current_track = rand_track.name
+
+
+
+
+          //   d3.json('/artist_top_tracks', {
+          //     method: "POST", 
+          //     headers: {'Content-Type': 'application/json'}, 
+          //     body:JSON.stringify({artist:d.name})}
+          //   ).then(results => {
+          //   if (audio) {audio.pause()}
+          //   now_playing.style("font-size", orig_d.radius/15).attr("y", orig_d.y+orig_d.radius*0.12*(i-2.5-0.02))
+          //   .attr("x", orig_d.x+orig_d.radius/50)
+          //   .style("display", "inline").text(results.name)
+          //   var bb = now_playing.node().getBBox()
+          //   rect_bg.attr("x", bb.x).attr("y", bb.y).attr("width", bb.width).attr("height", bb.height)
+          //   rect_moving.attr("x", bb.x).attr("y", bb.y).attr("width", 0).attr("height", bb.height)
+          //   rect_moving.transition().ease(d3.easeLinear).duration(30000).attr("width", bb.width)
+          //   audio = new Audio(results.uri)
+          //   audio.volume = 0.1
+          //   audio.play()
+          // })
           }
         })
-        .on("mouseout", (_, i) => {
-          if (i < num_listed_artists) { 
+        .on("mouseout", function(_,i) {
+        d3.select(this).style("fill", "000")
+          if (i < num_listed_artists & (!song_locked)) { 
             audio.pause() 
             rect_moving.transition()
             test_masked.selectAll("rect").attr("width", 0)
             now_playing.style("display", "none")
+            artist_names_group.selectAll("text").style("fill-opacity", 0.8)
+            current_track = null
+            current_artist = null
           }
         })
+        .on("click", function(d) { song_lock_toggle(); d3.event.stopPropagation() })
         .style("display", "none")
         .style("fill-opacity", 0)
       }
@@ -459,7 +549,7 @@ var results = d3.json("/top_genres", {method:"POST"}).then( results => {
 
     if (focused_0.radius || orig_d.radius) {
       artist_names_group.selectAll("text").transition().delay((d,i)=>d.parent===focused ? 1250+i*50 : i*50 ).duration(d => d.parent === focused ? 500 : 500)
-      .style("fill-opacity", d => d.parent === focused ? 1 : 0)
+      .style("fill-opacity", d => d.parent === focused ? 0.8 : 0)
       .attr("x", d => d.parent === focused ? orig_d.x : focused_0.x-focused_0.radius*0.75)
       .on("start", function(d) {if (d.parent === focused) this.style.display = "inline"; })
       .on("end", function(d) { if (d.parent !== focused) this.style.display = "none"; });
@@ -551,7 +641,7 @@ function adjust(k, color) {
 // //     .data(json.items)
 // //     .enter().append("p")
 // //       .text(function(d) { return d["name"] + ": " + d["genres"] ;}));
-6
+
 // // d3.selectAll("circle").transition()
 // //   .duration(750)
 // //   .delay(function(d, i) { return i * 10; })

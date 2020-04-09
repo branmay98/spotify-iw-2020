@@ -55,6 +55,24 @@ def top_genres():
 
     return json.dumps({"nodes": sorted_genres, "links": formatted_overlap})
 
+@app.route('/all_artists_top_tracks', methods=['POST'])
+def all_artists_top_tracks():
+    print("starting")
+    id = session["id"]
+    current_session = session_manager[id]
+    sp = current_session.sp
+    artist_dict = current_session.artist_dict
+
+    all_artist_uri = {}
+    for artist, uri in artist_dict.items():
+        top_tracks = sp.artist_top_tracks(uri)
+        tracks = [{"uri": track["preview_url"], "name": track["name"]} for track in top_tracks["tracks"]]
+        all_artist_uri[artist] = tracks
+    
+    print("done")
+    return json.dumps(all_artist_uri)
+
+
 
 @app.route('/artist_top_tracks', methods=['POST'])
 def artist_top_tracks():
