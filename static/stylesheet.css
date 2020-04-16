@@ -6,6 +6,53 @@
     border-radius: 2px;
     font-family: 'Circular', Arial, Helvetica, sans-serif;
 }
+#sidebar-wrapper {
+    width: fit-content;
+    display:inline-block;
+    height: 100%;
+    overflow: hidden;
+}
+#sidebar {
+    pointer-events:none;
+    width:100%;
+    z-index: 1000;
+    position: relative;
+    height: 100%;
+    padding-right: 20px;
+    overflow-y: scroll; /* Increase/decrease this value for cross-browser compatibility */
+    box-sizing: content-box;
+}
+#sidebar p{
+    cursor: pointer;
+    line-height:1;
+    padding-bottom: 0.3rem;
+    pointer-events:auto;
+    clear:both;
+    float:left;
+    margin:0;
+    font-weight: 400;
+}
+#sidebar p.hover{
+    font-weight: 700;
+}
+/* ::-webkit-scrollbar {
+    display: none;
+} */
+.index-text {
+    text-decoration: underline;
+    color: black;
+    position: relative;
+    z-index:2;
+    cursor: pointer; 
+}
+.index-text-hover {
+    /* background-color: black; */
+    text-decoration: underline;
+    color: white;
+    position: relative;
+    z-index:2;
+    cursor: pointer; 
+}
 #chart {
     position: fixed;
     left: 0px;
@@ -28,6 +75,22 @@
     src: url('fonts/circular-bold.woff2');
     font-weight: 700;
 }
+@font-face {
+    font-family: 'Circular';
+    src: url('fonts/circular-book-italic.woff2');
+    font-style: italic;
+}
+.blurb-no-hover {
+    backdrop-filter: blur(1.5px);
+    z-index: 100;
+}
 body {
     font-family: 'Circular';
+    width: 100%;
+    overflow: hidden;
+}
+body.index {
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }

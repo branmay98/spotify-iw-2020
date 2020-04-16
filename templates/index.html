@@ -1,6 +1,22 @@
 <html>
-<body>
-    <div id="main"> </div>
-    <a href="/login"> Log in </a>
+<head>
+    <title>genre-ation</title>
+    <link rel="stylesheet" href="static/stylesheet.css">
+    
+</head>
+<body class="index">
+    <div id="blurb" style="display:none" class="blurb-no-hover" >
+        <span style="font-size:48" class="index-text link" href="/login" onclick="onClick()" onmouseover="onMouseover()" onmouseout="onMouseout()">
+            <!-- <span style="font-style: italic;">genre</span>-ation -->
+            <span style="font-weight: bold;">genre-</span><span style="font-style:italic">ation</span>
+        </span>
+    </div>
+    <div id="chart"> </div>
+    
+    
+    <script src="static/d3.v5.min.js"></script>
+    <script src="http://unpkg.com/d3-force-bounce"></script>
+    <script src="http://unpkg.com/d3-force-surface"></script>
+    <script src="static/index.js"></script>
 </body>
 </html>
