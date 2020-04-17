@@ -1,7 +1,9 @@
 .d3-tip {
+    display: inline-block;
+    max-width: 300px;
     line-height: 1;
     font-weight: 400;
-    padding: 12px;
+    padding: 0 12 12 12;
     color: #fff;
     border-radius: 2px;
     font-family: 'Circular', Arial, Helvetica, sans-serif;
@@ -93,4 +95,8 @@ body.index {
     display: flex;
     justify-content: center;
     align-items: center;
+}
+
+span.grey {
+    color: gray;
 }

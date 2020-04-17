@@ -98,7 +98,7 @@ let view = [width/2, height/2, height] // change the third one
 
 const view_root = view
 
-var tip_node = d3Tip().attr('class', 'd3-tip').html(function(d) { return d.genre + ': ' + d.artists.length})
+var tip_node = d3Tip().attr('class', 'd3-tip').html(function(d) {return d.html})
 .style('background', d3.rgb(hue_tooltip_node,hue_tooltip_node,hue_tooltip_node,opacity_tooltip_node));
 // var tip_link = d3Tip().attr('class', 'd3-tip').html(function(d) { return d.source.genre + ' - ' + d.target.genre + ' strength: ' + d.weight; })
 // .style('background', d3.rgb(hue_tooltip_link,hue_tooltip_link,hue_tooltip_link,opacity_tooltip_link));
@@ -476,8 +476,20 @@ var results = d3.json("/top_genres", {method:"POST"}).then( results => {
   })
 
   var nodes = results.nodes.map(d => {
+    
+    html = `<h1>${d.genre}</h1>
+    <span style="display:block"><span class="grey"># of artists:</span><b> ${d.artists.length}</b></span>
+    <h3>rankings</h3>
+
+    `
+    for (var key in d.centrality) {
+      html += `<span style="display:block"><span class="grey">${key}: </span><b>T-${d.centrality[key]}</b>  </span>`
+    }
+
     return {
-      genre: d.genre, artists: d.artists, radius: d.artists.length**exp_radius_circle+const_radius_circle
+      genre: d.genre, artists: d.artists, radius: d.artists.length**exp_radius_circle+const_radius_circle,
+      centrality: d.centrality,
+      html:html
     }
   })
    
@@ -605,9 +617,11 @@ var results = d3.json("/top_genres", {method:"POST"}).then( results => {
 
 
   
-  $("#sidebar").append(nodes.map((current, i) => "<p style=\"font-size:" +(0.90+(current.radius/50)**1.1)+"rem\">" + current.genre + "</p>", ""))
+  $("#sidebar").append(nodes.map((current, i) => "<p class=\"sidebar\" style=\"opacity:0;font-size:" +(0.90+(current.radius/50)**1.1)+"rem\">" + current.genre + "</p>", ""))
 
   $("p").click(sidebarClick).mouseover(sidebarMouseover).mouseout(sidebarMouseout)
+  
+  console.log(d3.selectAll("p.sidebar").transition().delay((_,i)=>20*i).duration(500).style("opacity", 1))
   
 
 
@@ -691,7 +705,6 @@ function expand(current, d) {
     if (expanded !== d) {
       expanded = d 
       current.raise()
-      labels_group.raise()
       current_fill = d3.rgb(current.attr("fill"))
       current.transition().duration(1000).attr('r', (width**2+height**2)**(1/2)*d.radius*2/2*mult_zoom_radius_view/height)
       .attr("fill", adjust(brighten_expansion, current_fill)).on('start', () => expanding = true).on('end', () => expanding = false)
