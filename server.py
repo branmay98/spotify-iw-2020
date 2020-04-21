@@ -5,7 +5,6 @@ import pprint as pp
 import random
 from collections import defaultdict
 from urllib.parse import urlparse
-from timeit import default_timer as timer
 
 import networkx as nx
 import spotipy
@@ -59,8 +58,6 @@ def top_genres():
     else:
         print("top artists exists")
     
-
-    start = timer()
     node_data = [
         {"genre": item[0], 
         "artists": item[1], 
@@ -107,9 +104,6 @@ def top_genres():
     }, **node} for i, node in enumerate(node_data)]
     
 
-    end = timer()
-    print(new_node_data)
-    print(end-start)
 
     return json.dumps({"nodes": new_node_data, "links": link_data})
 
