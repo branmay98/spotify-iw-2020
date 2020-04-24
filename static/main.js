@@ -81,7 +81,7 @@ const mult_attraction_simulation = 1/10
 const mult_zoom_radius_view = 2
 const duration_transition_zoom = 1500
 const duration_stroke_transition_zoom = 1250
-const brighten_expansion = 5 
+const brighten_expansion = 7
 
 // artist lists
 const num_listed_artists = 8
@@ -122,6 +122,7 @@ let circles = null
 let links = null
 let labels = null
 let artist_names = null
+let sidebar = null
 let unlocked = null
 let locked = null
 let current_track_text = null
@@ -129,13 +130,15 @@ let current_artist_text = null
 let current_track_link = null
 let current_track_link_text = null
 
-let links_group = svg.append("g")
-let circles_group = svg.append("g")
-let labels_group = svg.append("g")
-let artist_names_group = svg.append("g")
-let lock_group = svg.append("g")
+let results = null
 
-let now_playing_group = svg.append("g")
+let links_group = svg.append("g").attr("id", "links")
+let circles_group = svg.append("g").attr("id", "circles")
+let labels_group = svg.append("g").attr("id", "labels")
+let artist_names_group = svg.append("g").attr("id", "artist_names")
+let lock_group = svg.append("g").attr("id", "lock")
+
+let now_playing_group = svg.append("g").attr("id", "now_playing")
 let mask = now_playing_group.append('mask').attr("id", "maskurl")
 let test_masked = now_playing_group.append("g").style("mask", "url(#maskurl)")
 var now_playing = mask.append("text").style("font-weight", 400).style("fill", "white")
@@ -143,31 +146,48 @@ let rect_bg = test_masked.append("rect").style("fill", "333").style("fill-opacit
 let rect_moving = test_masked.append("rect").style("fill", "000").style("fill-opacity", 0.5)
 
 
-window.addEventListener("resize", draw);
+window.addEventListener("resize", draw)
+window.addEventListener('keydown', function (e) {
+  if (e.key === "Escape") {
+    if (expanded) {
+      expandZoom(expanded)
+    }
+    else {
+      zoom(true, svg)
+    }
+  }
+  
+});
 function draw() {
   chartDiv = document.getElementById("chart");
   width = chartDiv.clientWidth;
   height = chartDiv.clientHeight;
   svg.attr("width", width).attr("height", height)
 
-  if (expanded) {
-    expand(circles.filter((data) => data === expanded), expanded)
+  // if (expanded) {
+  //   expand(circles.filter((data) => data === expanded), expanded)
+  // }
+  if (!expanded) {
+
+    zoom(true,svg, true)
+
+    unlocked.attr("y", height-200)
+    .attr("x", width-200)
+    locked.attr("y", height-200)
+    .attr("x", width-200)
+  
+    current_track_text.attr("y", height-150).attr("x", width-225)
+    current_artist_text.attr("y", height-100).attr("x", width-225)
+    current_track_link_text.attr("y", height-60).attr("x", width-225)
   }
-  zoom(true,svg, true)
-
-  unlocked.attr("y", height-200)
-  .attr("x", width-200)
-  locked.attr("y", height-200)
-  .attr("x", width-200)
-
-  current_track_text.attr("y", height-150).attr("x", width-225)
-  current_artist_text.attr("y", height-100).attr("x", width-225)
-  current_track_link_text.attr("y", height-60).attr("x", width-225)
 }
+
+
+
 
 function sidebarClick() {
   node = event.target
-  // console.log(node)
+  console.log(node)
   var id = [].indexOf.call(node.parentNode.children, node)
   if (sim_end) {
     circle = circles.filter((_, i) => i === id)
@@ -195,6 +215,26 @@ function sidebarMouseout() {
   var id = [].indexOf.call(node.parentNode.children, node)
   circles.filter((_, i) => i === id).style("stroke-width",0)
   node.innerHTML = node.innerHTML.split(":")[0]
+}
+
+function song_lock_toggle() {
+  song_locked = !song_locked
+  unlocked.style("display", () => song_locked ? "none" : "inline").style("opacity", 0.2).raise()
+  locked.style("display", () => song_locked ? "inline" : "none").style("opacity", 0.7).raise()
+  update_player()
+}
+
+function update_player() {
+  if (song_locked) {
+    current_track_text.text(current_track)
+    current_artist_text.text(current_artist)
+    current_track_link.select("text").text("Click to open in Spotify")
+    current_track_link.attr("xlink:href", current_link)
+  } else {
+    current_track_text.text("")
+    current_artist_text.text("")
+    current_track_link.select("text").text("")
+  }
 }
 
 function zoomTo(v) {
@@ -239,25 +279,49 @@ function zoomTo(v) {
   
 }
 
+function expandZoom(circle) {
+  if (!expanding) {
+    if (!expanded) {
+      expanded = circle
+      data = circle.data()[0]
+      console.log(data)
+      var next = [data.x, data.y, data.radius*0.01]
+      current_fill = d3.rgb(circle.attr("fill"))
+      
+      circle.transition().delay(duration_transition_zoom*(1/5)).duration(duration_transition_zoom*(4/5))
+        .attr("fill", adjust(1/brighten_expansion, current_fill))
+        .on('end', () => {
+          sidebar.style("display", "none")
+          artist_names_group.style("display", "none")
 
-function song_lock_toggle() {
-  song_locked = !song_locked
-  unlocked.style("display", () => song_locked ? "none" : "inline").style("opacity", 0.2).raise()
-  locked.style("display", () => song_locked ? "inline" : "none").style("opacity", 0.7).raise()
-  update_player()
-}
+          show_genre_page(circle)
+        })
 
-function update_player() {
-  if (song_locked) {
-    current_track_text.text(current_track)
-    current_artist_text.text(current_artist)
-    current_track_link.select("text").text("Click to open in Spotify")
-    current_track_link.attr("xlink:href", current_link)
-  } else {
-    current_track_text.text("")
-    current_artist_text.text("")
-    current_track_link.select("text").text("")
+      svg.transition()
+        .duration(duration_transition_zoom)
+        .tween("zoom", () => {
+          const i = d3.interpolateZoom(view, next);
+
+          return t => zoomTo(i(t));
+      }).on('start', () => expanding = true).on('end', () => expanding = false);
+
+      sidebar.transition().duration(500).style("opacity", 0)
+    } else {
+      expanded = null
+      data = circle.data()[0]
+      zoom(false, data)
+      current_fill = d3.rgb(circle.attr("fill"))
+      circle.transition().duration(duration_transition_zoom).attr("fill", adjust(brighten_expansion, current_fill))
+      .on('start', () => expanding = true).on('end', () => expanding = false)
+      sidebar.transition().duration(500).style("opacity", 1).on('start', () => {
+        artist_names_group.style("display", "inline")
+        sidebar.style("display", "inline")
+
+        hide_genre_page(circle)
+      })
+    }
   }
+  
 }
 
 function zoom(isBackground, orig_d, redraw=false) {
@@ -321,26 +385,6 @@ function zoom(isBackground, orig_d, redraw=false) {
           current_track = rand_track.name
           current_link = rand_track.link
 
-
-
-
-        //   d3.json('/artist_top_tracks', {
-        //     method: "POST", 
-        //     headers: {'Content-Type': 'application/json'}, 
-        //     body:JSON.stringify({artist:d.name})}
-        //   ).then(results => {
-        //   if (audio) {audio.pause()}
-        //   now_playing.style("font-size", orig_d.radius/15).attr("y", orig_d.y+orig_d.radius*0.12*(i-2.5-0.02))
-        //   .attr("x", orig_d.x+orig_d.radius/50)
-        //   .style("display", "inline").text(results.name)
-        //   var bb = now_playing.node().getBBox()
-        //   rect_bg.attr("x", bb.x).attr("y", bb.y).attr("width", bb.width).attr("height", bb.height)
-        //   rect_moving.attr("x", bb.x).attr("y", bb.y).attr("width", 0).attr("height", bb.height)
-        //   rect_moving.transition().ease(d3.easeLinear).duration(30000).attr("width", bb.width)
-        //   audio = new Audio(results.uri)
-        //   audio.volume = 0.1
-        //   audio.play()
-        // })
         }
       })
       .on("mouseout", function(_,i) {
@@ -469,7 +513,55 @@ function chooseDirection(x, y) {
   return [dir, x_offset, y_offset]
 }
 
-var results = d3.json("/top_genres", {method:"POST"}).then( results => {
+function show_genre_page(circle) {
+  data = circle.data()[0]
+
+  current_fill = d3.rgb(circle.attr("fill"))
+  accent = adjust(brighten_expansion, current_fill)
+
+  console.log(data)
+  console.log(links.data())
+  
+  index = data.index+1
+
+
+
+  var template = document.getElementById("listen-template").innerHTML
+  compiled = Handlebars.compile(template)
+  context = data
+  var html = compiled({...context, 
+    index,
+    local_genre_count:results.nodes.length, 
+    global_genre_count:4202})
+  $("body").append(html)
+  // header.append("h1").classed("children", true).text(data.genre)
+  // listen.append("h1").classed("children", true).text("Listen")
+  
+  // learn.append("h1").classed("children", true).text("Learn")
+  $(".accent").css("color", accent)
+  
+  $(".spotify-toggle").on('click', function () {
+    // console.log(this)
+    $("a.selected").removeAttr("style")
+    $("a.selected").removeClass("selected")
+    this.classList.add("selected")
+    this.style.color=accent
+  })
+  // console.log($("a:contains('sound')"))
+  $("a:contains('sound')")[0].click()
+
+}
+
+function hide_genre_page(circle) {
+  console.log("hidden")
+  d3.select("#genre-page").remove()
+  
+}
+
+d3.json("/top_genres", {method:"POST"}).then( r => {
+
+  results = r
+  console.log(results)
   
   d3.json("/all_artists_top_tracks", {method:"POST"}).then( function(d) {
     all_artists_top_tracks = d
@@ -489,12 +581,14 @@ var results = d3.json("/top_genres", {method:"POST"}).then( results => {
     return {
       genre: d.genre, artists: d.artists, radius: d.artists.length**exp_radius_circle+const_radius_circle,
       centrality: d.centrality,
-      html:html
+      html,
+      playlists:d.playlists,
+      popularity:d.popularity
     }
   })
+
    
   svg.on("click", function () {d3.event.stopPropagation(); zoom(true, d3.event.target)})
-  
    
   links = links_group
   .selectAll("line")
@@ -546,15 +640,16 @@ var results = d3.json("/top_genres", {method:"POST"}).then( results => {
     })
     .on('click', function (d) {
       d3.event.stopPropagation(); 
+      tip_node.hide(d)
       if (d3.event.defaultPrevented) return; // dragged
       if (sim_end) {
         if (focused !== d) {
           d3.select(this).transition().duration(duration_stroke_transition_zoom).style("stroke-width",0);
-          tip_node.hide(d)
           zoom(false, d);
         }
         else {
-          expand(d3.select(this), d)
+          expandZoom(d3.select(this))
+          // expand(d3.select(this), d)
         }
       }
     })  
@@ -621,9 +716,9 @@ var results = d3.json("/top_genres", {method:"POST"}).then( results => {
 
   $("p").click(sidebarClick).mouseover(sidebarMouseover).mouseout(sidebarMouseout)
   
-  console.log(d3.selectAll("p.sidebar").transition().delay((_,i)=>20*i).duration(500).style("opacity", 1))
+  sidebar = d3.selectAll("p.sidebar")
   
-
+  sidebar.transition().delay((_,i)=>20*i).duration(500).style("opacity", 1)
 
   var sim = d3.forceSimulation(nodes)
     .force('charge', d3.forceManyBody().distanceMax(110).strength(function (d) {
@@ -707,24 +802,31 @@ function expand(current, d) {
       current.raise()
       current_fill = d3.rgb(current.attr("fill"))
       current.transition().duration(1000).attr('r', (width**2+height**2)**(1/2)*d.radius*2/2*mult_zoom_radius_view/height)
-      .attr("fill", adjust(brighten_expansion, current_fill)).on('start', () => expanding = true).on('end', () => expanding = false)
+      .attr("fill", adjust(1/brighten_expansion, current_fill)).on('start', () => expanding = true).on('end', () => expanding = false)
     } else {
       current_fill = d3.rgb(current.attr("fill"))
-      artist_names_group.raise()
-      now_playing_group.raise()
+      // artist_names_group.raise()
+      // now_playing_group.raise()
       current.transition().duration(750).attr('r', d => d.radius)
-      .attr("fill", adjust(1/brighten_expansion, current_fill)).on('end', () => {expanding = false; 
+      .attr("fill", adjust(brighten_expansion, current_fill)).on('end', () => {expanding = false; 
         circles.order() })
       expanded = null
     }
   }
 }
 function adjust(k, color) {
+  console.log(color)
   let new_c = d3.rgb(
-    r= (255-(255-color.r)/k),
-    g= (255-(255-color.g)/k),
-    b= (255-(255-color.b)/k),
+    r= (255-(255-color.r)*k),
+    g= (255-(255-color.g)*k),
+    b= (255-(255-color.b)*k),
   );
+  // let new_c = d3.rgb(
+  //   r= color.r*k,
+  //   g= color.g*k,
+  //   b= color.b*k,
+  // );
+  console.log(new_c)
   return new_c
 }
 

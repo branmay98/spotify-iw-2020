@@ -3,6 +3,7 @@ import json
 import os
 import pprint as pp
 import random
+import pickle
 from collections import defaultdict
 from urllib.parse import urlparse
 
@@ -13,7 +14,7 @@ from flask import (Flask, make_response, redirect, render_template, request,
 from flask.helpers import send_from_directory
 from spotipy import oauth2
 
-app = Flask(__name__)
+app = Flask(__name__, static_url_path='/static')
 
 client_id = os.getenv("SPOTIPY_CLIENT_ID")
 client_secret = os.getenv("SPOTIPY_CLIENT_SECRET")
@@ -25,6 +26,9 @@ session_manager={}
 files = glob.glob('cache/*')
 for f in files:
     os.remove(f)
+
+with open("./static/genre_playlists_popularity.p", "rb") as fp:
+    genre_playlists_popularity = pickle.load(fp)
 
 @app.route('/top_genres', methods=['POST'])
 def top_genres():
@@ -95,13 +99,19 @@ def top_genres():
 
 
 
-    new_node_data = [ {"centrality": {
-        "artist": artist_r[node["genre"]],
-        "degree": deg_r[node["genre"]],
-        "closeness": close_r[node["genre"]],
-        "betweenness": bet_r[node["genre"]],
-        "eigenvector": eig_r[node["genre"]],
-    }, **node} for i, node in enumerate(node_data)]
+    new_node_data = [ 
+        {
+            "centrality": {
+                "artist": artist_r[node["genre"]],
+                "degree": deg_r[node["genre"]],
+                "closeness": close_r[node["genre"]],
+                "betweenness": bet_r[node["genre"]],
+                "eigenvector": eig_r[node["genre"]],
+            },
+            "playlists": genre_playlists_popularity[node["genre"]]["playlists"],
+            "popularity": genre_playlists_popularity[node["genre"]]["popularity_index"]+1,
+            **node
+        } for i, node in enumerate(node_data)]
     
 
 
@@ -126,17 +136,21 @@ def all_artists_top_tracks():
     print("done")
     return json.dumps(current_session.all_artists_tracks_uri)
 
-
+@app.route('/frame')
+def frame():
+    if "id" not in session or session["id"] not in session_manager:
+        return redirect("/")
+    return app.send_static_file("frame")
 
 @app.route('/main')
 def main_page():
-    if session["id"] not in session_manager:
+    if "id" not in session or session["id"] not in session_manager:
         return redirect("/")
-    return render_template("main.html")
+    return app.send_static_file("main.html")
 
 @app.route('/')
 def hello_world():
-    return render_template("index.html")
+    return app.send_static_file("index.html")
 
 @app.route('/login')
 def login():
