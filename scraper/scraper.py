@@ -88,7 +88,7 @@ for genreDiv in allGenreDivs:
             genreList[genre].append(artistName) 
     genreCnt = genreCnt+1
 
-with open('genreList.p', 'wb') as fp:
+with open('../static/genreList.p', 'wb') as fp:
     pickle.dump(genreList, fp)
 
 print ("There are " + str(len(genreList)) + " genres")
@@ -131,16 +131,22 @@ genres.sort()
 # %%
 ## save data for HTML processing
 
-with open('artistList.p', 'wb') as fp:
+with open('../static/artistList.p', 'wb') as fp:
     pickle.dump(artistList, fp)
 
-with open('genreList.p', 'wb') as fp:
+with open('../static/genreList.p', 'wb') as fp:
     pickle.dump(genreList, fp)
     
-with open('artists.p', 'wb') as fp:
+with open('../static/artists.p', 'wb') as fp:
     pickle.dump(artists, fp)
 
-with open('genres.p', 'wb') as fp:
+with open('../static/genres.p', 'wb') as fp:
     pickle.dump(genres, fp)
+
+# %%
+
+with open("../static/genreList.p", 'rb') as fp:
+    
+    print(sorted([(name, len(val)) for name, val in pickle.load(fp).items()], key=lambda d: -d[1])[:100])
 
 # %%

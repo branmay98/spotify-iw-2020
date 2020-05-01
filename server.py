@@ -27,8 +27,11 @@ files = glob.glob('cache/*')
 for f in files:
     os.remove(f)
 
-with open("./static/genre_playlists_popularity.p", "rb") as fp:
-    genre_playlists_popularity = pickle.load(fp)
+with open("./static/genre_playlists_popularity_artists_test.p", "rb") as fp:
+    genre_playlists_popularity_artists = pickle.load(fp)
+with open("./static/genreList.p", "rb") as fp:
+    all_genres = pickle.load(fp)
+    # print(all_genres)
 
 @app.route('/top_genres', methods=['POST'])
 def top_genres():
@@ -37,7 +40,7 @@ def top_genres():
     sp = current_session.sp
     if not current_session.all_top_artists:
         print("getting top artists")
-        artist_dict = {}
+        artist_dict = defaultdict(dict)
         all_top_artists = {}
 
         genre_dict = defaultdict(list)
@@ -45,13 +48,25 @@ def top_genres():
         for time_range in ["long_term", "medium_term", "short_term"]:
             top_artists = sp.current_user_top_artists(limit=50, time_range=time_range)
             for artist in top_artists["items"]:
-                if artist["name"] not in artist_dict:
-                    artist_dict[artist["name"]] = artist["uri"]
+                artist_name = artist["name"]
+                if artist_name not in artist_dict:
+                    for image in artist["images"]:
+                        if image["width"] < 200:
+                            artist_dict[artist_name]["image"] = image["url"]
+                            break
+                    else:
+                        print('bye')
+                        artist_dict[artist_name]["image"] = artist["images"][-1]["url"]
+                    artist_dict[artist_name]["genres"] = artist["genres"]
+                    artist_dict[artist_name]["uri"] = artist["uri"]
+                    artist_dict[artist_name]["popularity"] = artist["popularity"]
+                    artist_dict[artist_name]["time_range"] = [time_range]
                     for i, genre in enumerate(artist["genres"]):
-                        genre_dict[genre].append(artist["name"])
+                        genre_dict[genre].append(artist_name)
                         for j in range(i+1, len(artist["genres"])): # could be changed from 1/2 n^2 to n^2
                             overlap[genre][artist["genres"][j]] = overlap[genre].get(artist["genres"][j], 0) + 1
-                            
+                else:
+                    artist_dict[artist_name]["time_range"].append(time_range)
             all_top_artists[time_range] = top_artists
         
         current_session.artist_dict = artist_dict
@@ -83,7 +98,7 @@ def top_genres():
 
     def gen(d):
         cnt, index = 0, 0
-        it = sorted(d.items(), key=lambda data: d[data[0]], reverse=True)
+        it = sorted(d.items(), key=lambda data: data[1], reverse=True)
         yield index, it[cnt][0]
         while cnt < len(it) - 1 :
             cnt+=1
@@ -91,31 +106,49 @@ def top_genres():
                 index = cnt
             yield index, it[cnt][0]
 
+    total_artist_pop = {
+        genre: sum([current_session.artist_dict[artist]["popularity"] for artist in artists])  for genre, artists in current_session.genre_dict.items()
+    }
+    average_artist_pop = {
+        genre: sum([current_session.artist_dict[artist]["popularity"] for artist in artists])/len(artists)  for genre, artists in current_session.genre_dict.items()
+    }
+
+    personal_pop = {
+        genre: -genre_playlists_popularity_artists[genre]["popularity_index"]  for genre in genre_playlists_popularity_artists if genre in current_session.genre_dict 
+    }
+
+    personal_pop_r = {item: rank + 1 for rank, item in gen(personal_pop)}
+    # # pop_r = {item: rank + 1 for rank, item in gen(pop)}
     artist_r = {item: rank + 1 for rank, item in gen({node["genre"]: len(node["artists"]) for node in node_data})}
     deg_r = {item: rank+1 for rank, item in gen(deg)}
     close_r = {item: rank+1 for rank, item in gen(close)}
     bet_r = {item: rank+1 for rank, item in gen(bet)}
     eig_r = {item: rank+1 for rank, item in gen(eig)}
 
-
+    total_artist_pop_r = {item: rank + 1 for rank, item in gen(total_artist_pop)}
+    average_artist_pop_r = {item: rank + 1 for rank, item in gen(average_artist_pop)}
 
     new_node_data = [ 
         {
             "centrality": {
-                "artist": artist_r[node["genre"]],
+                "# of artists": artist_r[node["genre"]],
                 "degree": deg_r[node["genre"]],
                 "closeness": close_r[node["genre"]],
                 "betweenness": bet_r[node["genre"]],
                 "eigenvector": eig_r[node["genre"]],
             },
-            "playlists": genre_playlists_popularity[node["genre"]]["playlists"],
-            "popularity": genre_playlists_popularity[node["genre"]]["popularity_index"]+1,
+            "playlists": genre_playlists_popularity_artists[node["genre"]]["playlists"],
+            "popularity": {
+                "global": genre_playlists_popularity_artists[node["genre"]]["popularity_index"]+1,
+                "personal" : personal_pop_r[node["genre"]],
+                "artist": {
+                    "total": total_artist_pop_r[node["genre"]],
+                    "average": average_artist_pop_r[node["genre"]],
+                },
+            },
             **node
         } for i, node in enumerate(node_data)]
-    
-
-
-    return json.dumps({"nodes": new_node_data, "links": link_data})
+    return json.dumps({"nodes": new_node_data, "links": link_data, "artists": current_session.artist_dict, "all_genres": {genre: len(l["artists"]) for genre, l in genre_playlists_popularity_artists.items()}})
 
 
 @app.route('/all_artists_top_tracks', methods=['POST'])
@@ -128,8 +161,8 @@ def all_artists_top_tracks():
         artist_dict = current_session.artist_dict
 
         all_artist_uri = {}
-        for artist, uri in artist_dict.items():
-            top_tracks = sp.artist_top_tracks(uri)
+        for artist, data in artist_dict.items():
+            top_tracks = sp.artist_top_tracks(data["uri"])
             tracks = [{"uri": track["preview_url"], "name": track["name"], "link": track["external_urls"]["spotify"]} for track in top_tracks["tracks"]]
             all_artist_uri[artist] = tracks
         current_session.all_artists_tracks_uri = all_artist_uri

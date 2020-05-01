@@ -29,6 +29,9 @@ r = requests.get("http://everynoise.com/engenremap.html")
 soup = BeautifulSoup(r.text,"html.parser")
 allGenreDivs = soup.find_all("div", "genre scanme")
 
+
+genreCnt = 0
+
 for i, div in enumerate(allGenreDivs):
     
     genre = div.get_text().split("»")[0]
@@ -36,6 +39,8 @@ for i, div in enumerate(allGenreDivs):
     playlist_link_dict = {} 
     url = f"http://everynoise.com/{(div.find_next('a')['href'])}"
     soup = BeautifulSoup(requests.get(url).text,"html.parser")
+
+
     all_a = soup.find("div", "title").find_all("a")
     for a in all_a:
         if a.get_text() == "playlist":
@@ -53,6 +58,22 @@ for i, div in enumerate(allGenreDivs):
     genre_metadata[genre]["playlists"] = playlist_link_dict
 
     
+    genre_metadata[genre]["artists"] = []
 
-with open("../static/genre_playlists_popularity.p", "wb") as fp:
+    allArtistDivs = soup.find_all("div", "genre scanme")
+
+    for artist in allArtistDivs:
+        artistName = str.strip(artist.getText())[:-1]
+        if not(artistName.isspace()):
+            genre_metadata[genre]["artists"].append(artistName) 
+    genreCnt = genreCnt+1
+
+print ("There are " + str(len(genre_metadata)) + " genres")
+
+
+for genre in genre_metadata:
+    genre_metadata[genre]["artists"] = sorted(list(set(genre_metadata[genre]["artists"])))
+
+with open("../static/genre_playlists_popularity_artists_test.p", "wb") as fp:
     pickle.dump(genre_metadata, fp)
+

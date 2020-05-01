@@ -96,7 +96,7 @@ let svg = d3.select("div#chart").append('svg').attr("width", width).attr("height
 
 let view = [width/2, height/2, height] // change the third one 
 
-const view_root = view
+let view_root = view
 
 var tip_node = d3Tip().attr('class', 'd3-tip').html(function(d) {return d.html})
 .style('background', d3.rgb(hue_tooltip_node,hue_tooltip_node,hue_tooltip_node,opacity_tooltip_node));
@@ -117,6 +117,7 @@ let song_locked = false
 let current_artist = null
 let current_track = null
 let current_link = null
+let sim = null
 
 let circles = null
 let links = null
@@ -153,7 +154,7 @@ window.addEventListener('keydown', function (e) {
       expandZoom(expanded)
     }
     else {
-      zoom(true, svg)
+      zoom(true, svg.node())
     }
   }
   
@@ -163,25 +164,25 @@ function draw() {
   width = chartDiv.clientWidth;
   height = chartDiv.clientHeight;
   svg.attr("width", width).attr("height", height)
+  view_root = [width/2, height/2, height]
+  sim.force('center', d3.forceCenter(width/2, height/2)).restart()
 
   // if (expanded) {
   //   expand(circles.filter((data) => data === expanded), expanded)
   // }
   if (!expanded) {
-
-    zoom(true,svg, true)
-
-    unlocked.attr("y", height-200)
-    .attr("x", width-200)
-    locked.attr("y", height-200)
-    .attr("x", width-200)
-  
-    current_track_text.attr("y", height-150).attr("x", width-225)
-    current_artist_text.attr("y", height-100).attr("x", width-225)
-    current_track_link_text.attr("y", height-60).attr("x", width-225)
+    zoom(true,svg.node(), true)
   }
-}
+  
+  unlocked.attr("y", height-200)
+  .attr("x", width-200)
+  locked.attr("y", height-200)
+  .attr("x", width-200)
 
+  current_track_text.attr("y", height-150).attr("x", width-225)
+  current_artist_text.attr("y", height-100).attr("x", width-225)
+  current_track_link_text.attr("y", height-60).attr("x", width-225)
+}
 
 
 
@@ -190,10 +191,10 @@ function sidebarClick() {
   console.log(node)
   var id = [].indexOf.call(node.parentNode.children, node)
   if (sim_end) {
-    circle = circles.filter((_, i) => i === id)
-
-    circle.transition().duration(duration_stroke_transition_zoom).style("stroke-width",0);
-    zoom(false, circle.data()[0]);
+    selected = circles.filter((_, i) => i === id)
+    selected.transition().duration(duration_stroke_transition_zoom).style("stroke-width",0);
+    zoom(false, selected.data()[0]);
+    tip_node.direction(dir).hide(selected.data()[0]);
   }
 
 }
@@ -204,7 +205,25 @@ function sidebarMouseover() {
 
   var id = [].indexOf.call(node.parentNode.children, node)
   selected = circles.filter((_, i) => i === id).style("stroke-width",3).style("stroke", d3.rgb(80,80,80,0.9))
-  node.innerHTML+= ":<i style=\"font-weight:normal\"> " + selected.data()[0].artists.length + "</i>"
+  if (focused === svg.node()) {
+
+    x = selected.attr("cx")
+    y = selected.attr("cy")
+    
+    let offset_x, offset_y, dir
+    [dir, offset_x, offset_y] = chooseDirection(x, y) 
+    
+    var target = d3.select('#tipfollowscursor')
+    .attr('x', x - offset_x)
+    .attr('y', y - offset_y) // 5 pixels above the cursor
+    .node();
+    
+    tip_node.direction(dir).show(selected.data()[0], target);
+  }
+  else {
+    console.log(focused)
+    console.log(svg.node())
+  }
   // console.log(node.innerHtml)
 }
 
@@ -213,8 +232,10 @@ function sidebarMouseout() {
   node.classList.remove("hover")
 
   var id = [].indexOf.call(node.parentNode.children, node)
-  circles.filter((_, i) => i === id).style("stroke-width",0)
-  node.innerHTML = node.innerHTML.split(":")[0]
+  selected = circles.filter((_, i) => i === id).style("stroke-width",0)
+  if (focused === svg.node()) {
+    tip_node.direction(dir).hide(selected.data()[0]);
+  }
 }
 
 function song_lock_toggle() {
@@ -284,7 +305,7 @@ function expandZoom(circle) {
     if (!expanded) {
       expanded = circle
       data = circle.data()[0]
-      console.log(data)
+      // console.log(data)
       var next = [data.x, data.y, data.radius*0.01]
       current_fill = d3.rgb(circle.attr("fill"))
       
@@ -293,6 +314,7 @@ function expandZoom(circle) {
         .on('end', () => {
           sidebar.style("display", "none")
           artist_names_group.style("display", "none")
+          circle.style("stroke-width", 0)
 
           show_genre_page(circle)
         })
@@ -307,22 +329,29 @@ function expandZoom(circle) {
 
       sidebar.transition().duration(500).style("opacity", 0)
     } else {
-      expanded = null
-      data = circle.data()[0]
-      zoom(false, data)
-      current_fill = d3.rgb(circle.attr("fill"))
-      circle.transition().duration(duration_transition_zoom).attr("fill", adjust(brighten_expansion, current_fill))
-      .on('start', () => expanding = true).on('end', () => expanding = false)
-      sidebar.transition().duration(500).style("opacity", 1).on('start', () => {
-        artist_names_group.style("display", "inline")
-        sidebar.style("display", "inline")
+      
+      d3.select("#genre-page").transition().duration(500).style("row-gap", "1000px").style("opacity", 0).on('end', () => {
+        d3.select("#genre-page-container").remove()
+        expanded = null
+        data = circle.data()[0]
+        zoomTo([data.x, data.y, data.radius*0.01])
+        artist_names_group.selectAll("text")
+        .attr("x", data.x).attr("y", (_, i) => data.y+data.radius*0.12*(i-2.5))
 
-        hide_genre_page(circle)
+        zoom(false, data)
+        current_fill = d3.rgb(circle.attr("fill"))
+        circle.transition().duration(duration_transition_zoom).attr("fill", adjust(brighten_expansion, current_fill))
+        .on('start', () => expanding = true).on('end', () => expanding = false)
+        sidebar.transition().duration(500).style("opacity", 1).on('start', () => {
+          artist_names_group.style("display", "inline")
+          sidebar.style("display", "inline")
+
+        })
       })
-    }
+    } 
   }
-  
 }
+
 
 function zoom(isBackground, orig_d, redraw=false) {
   resize = redraw ? 0 : 1
@@ -339,8 +368,6 @@ function zoom(isBackground, orig_d, redraw=false) {
   // }
   if (isBackground) {
     next = view_root
-    // console.log(orig_d)
-   
   } else {
     next = [orig_d.x, orig_d.y, orig_d.radius*mult_zoom_radius_view]
     if (focused !== focused_0){
@@ -370,7 +397,7 @@ function zoom(isBackground, orig_d, redraw=false) {
             }
             now_playing.style("display", "none");
           })
-          audio.volume = 0.2
+          audio.volume = 0.5
           audio.play()
 
           now_playing.style("font-size", orig_d.radius/15).attr("y", orig_d.y+orig_d.radius*0.12*(i-2.5-0.02))
@@ -437,7 +464,9 @@ function zoom(isBackground, orig_d, redraw=false) {
 
 unlocked = lock_group.append("svg:image")
             .attr("xlink:href", "static/unlocked.svg").attr("y", height-200)
-            .attr("x", width-200).style("display", "inline").style("opacity", 0.2)
+            .attr("x", width-200).style("display", "inline").style("opacity", 0.2).on('click', function () {
+              d3.event.stopPropagation()
+            })
 locked = lock_group.append("svg:image")
             .attr("xlink:href", "static/locked.svg").attr("y", height-200)
             .attr("x", width-200).style("display", "none").style("opacity", 0.7)
@@ -514,54 +543,65 @@ function chooseDirection(x, y) {
 }
 
 function show_genre_page(circle) {
+
   data = circle.data()[0]
+
+  neighbor_links_string = results.links.filter(d => d.source.index === data.index || d.target.index === data.index)
+    .sort((a,b) => b.weight-a.weight).slice(0,4).map((d)=>d.source.index === data.index ? d.target.genre : d.source.genre)
+    .join(", ")
+
+  
 
   current_fill = d3.rgb(circle.attr("fill"))
   accent = adjust(brighten_expansion, current_fill)
 
-  console.log(data)
-  console.log(links.data())
+  stylesheet = document.styleSheets[0]
   
-  index = data.index+1
-
-
+  stylesheet.insertRule(`.accent { font-weight:700; color:${accent}}`,stylesheet.cssRules.length)
+  stylesheet.insertRule(`.background-light {background-color:${current_fill}}`,stylesheet.cssRules.length)
+  stylesheet.insertRule(`.background-accent {background-color:${accent}}`,stylesheet.cssRules.length)
 
   var template = document.getElementById("listen-template").innerHTML
   compiled = Handlebars.compile(template)
   context = data
-  var html = compiled({...context, 
-    index,
-    local_genre_count:results.nodes.length, 
-    global_genre_count:4202})
+
+  artists_by_artists = data.artists.length/results.nodes.length
+  artists_by_genre = data.artists.length/results.all_genres[data.genre]
+
+  // TODO: change this to use helpers instead for anything that touches results
+  new_data = {...context, 
+    time_terms:["long_term", "medium_term", "short_term"],
+    index:data.index+1,
+    personal_genre_count:results.nodes.length,
+    neighbor_links_string,
+    global_artist_genre_count:results.all_genres[data.genre],
+    artists_by_artists:(artists_by_artists*100).toFixed(1),
+    artists_by_genre:(artists_by_genre*100).toFixed(1),
+    global_genre_count:Object.keys(results.all_genres).length}
+
+  console.log(new_data)
+  var html = compiled(new_data)
   $("body").append(html)
-  // header.append("h1").classed("children", true).text(data.genre)
-  // listen.append("h1").classed("children", true).text("Listen")
+
+  d3.select("#genre-page").transition().duration(500).style("row-gap", "30px").style("opacity", 1)
   
-  // learn.append("h1").classed("children", true).text("Learn")
-  $(".accent").css("color", accent)
-  
+
   $(".spotify-toggle").on('click', function () {
-    // console.log(this)
-    $("a.selected").removeAttr("style")
-    $("a.selected").removeClass("selected")
-    this.classList.add("selected")
-    this.style.color=accent
+    $(".spotify-toggle").removeClass("accent")
+    this.classList.add("accent")
   })
-  // console.log($("a:contains('sound')"))
   $("a:contains('sound')")[0].click()
 
 }
 
 function hide_genre_page(circle) {
-  console.log("hidden")
-  d3.select("#genre-page").remove()
-  
+  // console.log("hidden")
 }
 
 d3.json("/top_genres", {method:"POST"}).then( r => {
 
   results = r
-  console.log(results)
+  console.log(Object.keys(results.artists))
   
   d3.json("/all_artists_top_tracks", {method:"POST"}).then( function(d) {
     all_artists_top_tracks = d
@@ -571,11 +611,11 @@ d3.json("/top_genres", {method:"POST"}).then( r => {
     
     html = `<h1>${d.genre}</h1>
     <span style="display:block"><span class="grey"># of artists:</span><b> ${d.artists.length}</b></span>
-    <h3>rankings</h3>
+    <h3>centralities</h3>
 
     `
     for (var key in d.centrality) {
-      html += `<span style="display:block"><span class="grey">${key}: </span><b>T-${d.centrality[key]}</b>  </span>`
+      html += `<span style="display:block"><span class="grey">${key}: </span><b>${d.centrality[key]}${nth(d.centrality[key])}</b>  </span>`
     }
 
     return {
@@ -583,7 +623,7 @@ d3.json("/top_genres", {method:"POST"}).then( r => {
       centrality: d.centrality,
       html,
       playlists:d.playlists,
-      popularity:d.popularity
+      popularity:d.popularity,
     }
   })
 
@@ -633,6 +673,16 @@ d3.json("/top_genres", {method:"POST"}).then( r => {
     .attr("index", data => data.index)
     .attr("r", data => data.radius)
     .attr("fill", function color(_, i) {
+      
+      radius = Math.random()*50+50
+      if (i < 12) {
+        angle = (Math.random()+i)*Math.PI/6 
+      } else {
+        angle = Math.random()*2*Math.PI  
+      }
+      
+      return d3.lab(Math.random()*5+75, Math.cos(angle)*radius, Math.sin(angle)*radius)
+
       if (i < 6) {
         return d3.hsl(Math.max(Math.min(Math.random()*60+60*i-30, 360),0), Math.random()*0.3+0.7, Math.random()*0.1+0.6)
       }
@@ -644,6 +694,7 @@ d3.json("/top_genres", {method:"POST"}).then( r => {
       if (d3.event.defaultPrevented) return; // dragged
       if (sim_end) {
         if (focused !== d) {
+          console.log(d3.select(this))
           d3.select(this).transition().duration(duration_stroke_transition_zoom).style("stroke-width",0);
           zoom(false, d);
         }
@@ -720,7 +771,7 @@ d3.json("/top_genres", {method:"POST"}).then( r => {
   
   sidebar.transition().delay((_,i)=>20*i).duration(500).style("opacity", 1)
 
-  var sim = d3.forceSimulation(nodes)
+  sim = d3.forceSimulation(nodes)
     .force('charge', d3.forceManyBody().distanceMax(110).strength(function (d) {
       return -30
     }))
@@ -768,6 +819,7 @@ d3.json("/top_genres", {method:"POST"}).then( r => {
 
 
   function dragstarted(d) {
+    tip_node.hide(d)
     if (focused === svg.node()) {
       d.fx = d.x;
       d.fy = d.y;
@@ -776,7 +828,7 @@ d3.json("/top_genres", {method:"POST"}).then( r => {
   
   function dragged(d) {
     if (focused === svg.node()){
-      sim.alphaTarget(0.3).restart();
+      sim.alphaTarget(0.08).restart();
       d.fx = d3.event.x;
       d.fy = d3.event.y;
     }
@@ -815,6 +867,7 @@ function expand(current, d) {
   }
 }
 function adjust(k, color) {
+
   console.log(color)
   let new_c = d3.rgb(
     r= (255-(255-color.r)*k),
@@ -830,6 +883,65 @@ function adjust(k, color) {
   return new_c
 }
 
+const nth = function(d) {
+  if (d > 3 && d < 21) return 'th';
+  switch (d % 10) {
+    case 1:  return "st";
+    case 2:  return "nd";
+    case 3:  return "rd";
+    default: return "th";
+  }
+}
+
+Handlebars.registerHelper("nth", nth);
+
+Handlebars.registerHelper("join-artists", function(genre, artist) {
+  return [...results.artists[artist].genres.filter(g=>g!==genre), `(${genre})`].join( ", ")
+});
+
+Handlebars.registerHelper("url", function(artist) {
+  return results.artists[artist].image
+})
+
+Handlebars.registerHelper("make-bars", function (artist) {
+  filled = Math.round(results.artists[artist].popularity/10)
+  console.log(filled)
+  acc = ""
+  for (var index = 0; index < 10; index ++) {
+    if (index < filled) {
+      acc+= `<div class="bar background-accent"></div>`
+    } else {
+      acc+= `<div class="bar bar-unfilled"></div>`
+    }
+  }
+  return acc
+})
+
+Handlebars.registerHelper("time-terms", function (artist) {
+  divs = []
+  for (var term of ["short_term", "medium_term", "long_term"]) {
+    if (results.artists[artist].time_range.includes(term)) {
+      divs.push(`<div class='artist-time-term-exist accent'>&#10004; ${timeWords(term)}</div>`)
+    } else {
+      divs.push(`<div class='artist-time-term-no-exist'>&#10008; ${timeWords(term)}</div>`)
+    }
+  }
+  return divs.join("")
+})
+
+
+function timeWords (time) {
+  switch (time) {
+    case "long_term":
+      return "more than 1 year"
+    case "medium_term":
+      return "within 6 months"
+    case "short_term":
+      return "within 1 month"
+    default:
+      return "whomst"
+  }  
+}
 // nodes.then(nodes => 
 //   svg.selectAll("circle").data(nodes.data)
 //   .enter().append("circle")

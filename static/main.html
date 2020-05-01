@@ -18,43 +18,114 @@
   <script src="static/d3-tip.js"></script>
   <script src="static/main.js"></script>
   <script id="listen-template" type="text/x-handlebars-template">
-    <div id="genre-page">
-      <div id="header" class="genre-content-container" style="grid-column:4/16">
-        <h1 id="genre-heading">{{genre}}</h1>
-        <span class="subtitle"><i>similar: pop, rock, hip-hop, soul, r&b</i></span>
-      </div>
-      <div id="learn" class="genre-content-container" style="grid-column:4/10">
-        <h1 class="title">Learn</h1>
-        <h3>Popularity:</h3>
-        <div style="display: flex; flex-direction:row; align-items: center; justify-content: center;">
-          <div class="popularity" style="display:flex; flex-direction:column; align-items:center">
-            <span style="display:block;">
-              <span class="accent" style="font-weight:bold;font-size: 72;">{{index}}</span> / {{local_genre_count}}
-            </span>
-              <span class="subtitle" style="font-size:unset;">personal</span>
-          </div>
-          <div class="popularity" style="display:flex; flex-direction:column; align-items:center">
-            <span style="display:inline-block;">
-              <span class="accent" style="font-weight:bold;font-size: 72;">{{popularity}}</span> / {{global_genre_count}}
-            </span> 
-              <span class="subtitle" style="font-size:unset;">global</span>
+    <div id="genre-page-container" class="background-light"> 
+      <div id="genre-page">
+        <div id="header" class="genre-content-container">
+          <div id="genre-heading">{{genre}}</div>
+          <span id="main-subtitle" class="subtitle">most similar: <span style="font-weight:700;  color:rgb(96, 96, 96); ">{{neighbor_links_string}}</span></span>
+          <div id="header-stats" class="row-right-container">
+            {{#each centrality}}
+            <div class="segmented-stat column-centering-container">
+              <div style="font-size:48">
+                <span class="accent">{{@this}}</span><span class="accent" style="font-size:32;font-weight:300">{{nth @this}}</span>
+              </div>
+              <span class="subtitle">{{@key}}</span>
+            </div>
+            {{/each}}
           </div>
         </div>
-      </div>
-      <div id="listen" class="genre-content-container" style="grid-column:10/16">
-        <h1 class="title">Listen</h1>
-        <div class="centering-container">
-          {{#each playlists}}
-          <a class="spotify-toggle" target="spotify" href="https://open.spotify.com/embed/playlist/{{this}}">{{@key}}
+        <div id="learn" class="genre-content-container">
+          <h1 class="title">Learn</h1>
+          <div class="subheading">Overview</div>
+          <div class="row-centering-container">
+            <div class="segmented-stat column-centering-container">
+              <span class="accent big-stat">{{artists.length}}</span>
+              <span class="subtitle"># of <b>your</b> artists in this genre</span>
+            </div>
+            <div class="segmented-stat column-centering-container">
+              <span class="accent big-stat">{{global_artist_genre_count}}</span>
+              <span class="subtitle"># of <b>total</b> artists in this genre</span>
+            </div>
+          </div>
+          
+          <div class="subheading">Coverage:</div>
+          <div class="row-centering-container">
+            <div class="segmented-stat column-centering-container" >
+              <div style="height:fit-content"> 
+                <span class="accent big-stat">{{artists_by_artists}}</span>%</div>
+                <span class="subtitle">by your top artists</span>
+              </div>
+              <div class="segmented-stat column-centering-container" >
+                <div>
+                  <span class="accent big-stat">{{artists_by_genre}}</span>%</div> 
+                  <span class="subtitle">by all artists in this genre</span>
+                </div>
+              </div>
+              
+              <div class="subheading">Popularity by Genre:</div>
+              <div class="row-centering-container">
+                <div class="segmented-stat column-centering-container" >
+                  <div> 
+                    <span class="accent big-stat">{{popularity.personal}}</span> / {{personal_genre_count}}</div>
+                    <span class="subtitle">personal</span>
+                  </div>
+                  <div class="segmented-stat column-centering-container" >
+                    <div>
+                      <span class="accent big-stat">{{popularity.global}}</span> / {{global_genre_count}}</div> 
+                      <span class="subtitle">global</span>
+              </div>
+            </div>
+            
+            <div class="subheading">Popularity by Artist:</div>
+            <div class="row-centering-container">
+              <div class="segmented-stat column-centering-container" >
+                <div> 
+                  <span class="accent big-stat">{{popularity.artist.total}}</span> / {{personal_genre_count}}</div>
+                  <span class="subtitle">total</span>
+                </div>
+                <div class="segmented-stat column-centering-container" >
+                  <div>
+                    <span class="accent big-stat">{{popularity.artist.average}}</span> / {{personal_genre_count}}</div> 
+                    <span class="subtitle">average</span>
+                  </div>
+                </div>
+                
+        </div>
+        <div id="listen" class="genre-content-container">
+          <h1 class="title">Listen</h1>
+          <div class="row-centering-container">
+            {{#each playlists}}
+            <a class="spotify-toggle segmented-stat" target="spotify" href="https://open.spotify.com/embed/playlist/{{this}}">{{@key}}
+              {{/each}}
+            </a>
+          </div>
+          
+          <iframe id="player" href="https://open.spotify.com/embed/playlist/{{this}}" name="spotify" width="100%" frameborder="0" allowtransparency="true" allow="encrypted-media"></iframe>
+        </div>
+        <div id="list" class="genre-content-container">
+          <h1 class="title">List</h1>
+          {{#each artists}}
+          <!-- <div class="genre-content-container extra-margin"> -->
+          <div class="artist-container">
+            <!-- <div class="artist-picture" style="background-image: url({{url this}});"></div> -->
+            <img class="artist-picture" src="{{url this}}"/>
+            <div class="artist-content">
+              <div class="artist-headline">
+                <span class="artist-name">{{this}}</span>
+              </div>
+              <div class="subtitle artist-genres">{{join-artists ../genre this}}</div>
+              <div id="bars">{{{make-bars this}}}</div>
+            </div>
+            <div class="artist-time-terms">
+              {{{time-terms this}}}
+            </div>
+          </div>
           {{/each}}
-          </a>
         </div>
-       
-        <iframe id="player" href="https://open.spotify.com/embed/playlist/{{this}}" name="spotify" width="100%" height=500px frameborder="0" allowtransparency="true" allow="encrypted-media"></iframe>
       </div>
     </div>
-    
-</script>
+        
+  </script>
   <link rel="icon" type="image/png" sizes="32x32" href="static/favicon-32x32.png">
 </body>
 </html>
