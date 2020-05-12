@@ -5,9 +5,54 @@
     <link rel="stylesheet" type="text/css" href="static/stylesheet.css">
   </head>
 <body>   
-  
-  <div id="sidebar-wrapper">
-    <div id="sidebar">
+  <div class="esc-button zoom" class="column-centering-container" onclick="zoom(true, svg.node())">
+    <div style="font-size: 32;margin-bottom: 3;">&#9587;</div>
+    <div>Esc</div>
+  </div>
+  <div class="note background" id="main-note">
+    <div class="note-text" id="main-note-text">
+      Each circle, or <i>node</i> represents one of your top genres. <i>Nodes</i> that are linked share some of your top artists between their corresponding genres.
+      <br><br>
+      
+      <b>Hover</b> over a <i>node</i> to see genre stats. <b>Click</b> on a <i>node</i> to see your top artists of that genre. <b>Click+Drag</b> a <i>node</i> to interact with the network.
+    </div>
+    <div>&#9432;</div>
+  </div>
+  <div class="note zoom" id="zoom-note">
+    <div class="note-text" id="zoom-note-text">
+      <b>Hover+Unhover</b> over an <i>artist</i> to <i>play+pause</i> a short preview of a <i>randomly chosen song</i> from their top songs.
+      <br><br>
+      <b>Click+Click</b> an <i>artist</i> to <i>lock+unlock</i> the currently playing track. A <i>locked</i> track plays until completion even without hover, and its information + an external Spotify link is displayed.
+      <br><br>
+      <b>Click</b> the rest of the <i>node</i> to see detailed genre information.
+      <br>
+      <b>Click</b> <i>other nodes</i> to switch genres. 
+      <br>
+      <b>ESC or Click</b> the <i>background</i> to zoom out.
+    </div>
+    <div>&#9432;</div>
+  </div>
+  <div id="sidebar-general">
+    <div id="sidebar-wrapper">
+      <div id="sidebar">
+      </div>
+      <div id="sidebar-selector" >
+        <div id="sidebar-genre" class="sidebar-options">genres</div>
+        <div id="sidebar-artist" class="sidebar-options">artists</div>
+      </div>
+    </div>
+    
+    <div class="note background" id="sidebar-note">
+      <div>&#9432;</div>
+      <div class="note-text" id="sidebar-note-text">
+        The <i>sidebar</i> interactively summarizes your personal data. You can view the full list of either your top <i>genres</i> or <i>artists</i>.
+        <br><br>
+        
+        <b>Click</b> either <i>genres</i> and <i>artists</i> to change your view. <b>Scroll</b> to see all the data.
+        <br><br>
+        <span>&emsp;<i>genres</i>: <b>Hover</b> to see genre stats. <b>Click</b> to see your top artists of that genre. Font size is proportional to number of artists.
+        <br>&emsp;<i>artists</i>: <b>Hover</b> to locate the genres this artist is classified under. Font size is proportional to artist popularity</span>
+      </div>
     </div>
   </div>
   <div id="chart" class="fullscreen"></div>
@@ -20,6 +65,61 @@
   <script id="listen-template" type="text/x-handlebars-template">
     <div id="genre-page-container" class="background-light"> 
       <div id="genre-page">
+        <div class="note expand" id="expand-note">
+          <div style="padding-left: 50px;">&#9432;</div>
+          <div class="note-text" id="expand-note-text">
+            <b>Check out detailed information about your genre, both personal and global.</b>
+            <br>
+            There are <i>four</i> sections: <i>Header</i>, <i>Learn</i>, <i>Listen</i>, <i>List</i>
+            <br><br>
+            <b>Header:</b> <br>
+            &emsp;<u>Similar genres</u> to the current genre are listed. These genres are computed using your shared top artists. <br>
+            &emsp;<u>Centrality measurements</u> describe how central, or important, this genre is within your network of top genres and artists. A higher ranking means a more central genre. 
+            These stats are calculated using 5 different metrics. 
+            <br><br>
+            
+            <b>Learn:</b> <br>
+            Learn more statistics about your genre, both in a personal and global context. <br><br>
+            
+            &emsp;<u>Overview</u> <br>
+            &emsp;&mdash; the number of <i>your top artists</i> classified in this genre. <br>
+            &emsp;&mdash; the number of artists classified in this genre <i>globally</i>. 
+            <br><br>
+
+            &emsp;<u>Coverage</u> <br>
+            &emsp;&mdash; the percentage of <i>your top artists</i> classified in this genre. <br>
+            &emsp;&mdash; the percentage of artists classified in this genre <i>globally</i>.
+            <br><br>
+
+            &emsp;<u>Popularity by Genre</u> <br>
+            &emsp;&mdash; the global popularity rank of this genre out of <i>your top genres</i>. <br>
+            &emsp;&mdash; the global popularity rank of this genre out of <i>all genres</i>. 
+            <br><br>
+
+            &emsp;<u>Popularity by Artist</u> <br>
+            &emsp;&mdash; the <i>total aggregate popularity</i> of your top artists of this genre. <br>
+            &emsp;&mdash; the <i>average popularity</i>of your top artists of this genre.  
+            <br><br>
+            
+            <b>Listen:</b> <br>
+            Listen to tracks in this genre through 4 playlists curated from listening data by Spotify. Each playlist samples a unique facet of listening from the genre community. <br>
+            &emsp;<u>Sound:</u> a general playlist featuring the sounds of this genre. <br>
+            &emsp;<u>Intro:</u> a playlist introducing the sounds of this genre to listeners of all types. <br>
+            &emsp;<u>Pulse:</u> a playlist featuring sounds that fans of this genre are listening to. <br>
+            &emsp;<u>Edge:</u> a playlist featuring lesser-known sounds that fans of this genre are listening to. 
+            <br><br>
+            
+            <b>List:</b> <br>
+            See all of your top artists in this genre, and additional information like <u>their classified genres</u>, <u>their global popularity</u>, and <u>time ranges you listened to them the most in.</u>
+            <br><br>
+            <u>Note:</u> <b style="font-size: unset;">popularity</b> is a score from 0-100 assigned by Spotify to each artist loosely based on their global monthly listener count. 
+
+          </div>
+        </div>
+        <div class="esc-button" class="column-centering-container" onclick="expandZoom(expanded)">
+          <div style="font-size: 32;margin-bottom: 3;">&#9587;</div>
+          <div>Esc</div>
+        </div>
         <div id="header" class="genre-content-container">
           <div id="genre-heading">{{genre}}</div>
           <span id="main-subtitle" class="subtitle">most similar: <span style="font-weight:700;  color:rgb(96, 96, 96); ">{{neighbor_links_string}}</span></span>
@@ -108,7 +208,7 @@
           <!-- <div class="genre-content-container extra-margin"> -->
           <div class="artist-container">
             <!-- <div class="artist-picture" style="background-image: url({{url this}});"></div> -->
-            <img class="artist-picture" src="{{url this}}"/>
+            <img class="artist-picture" src="{{url this}}" alt="No image"/>
             <div class="artist-content">
               <div class="artist-headline">
                 <span class="artist-name">{{this}}</span>

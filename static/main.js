@@ -65,7 +65,7 @@ const leading_sidebar = 13
 
 // links
 const max_link_weight = 25
-const range_hue_link = 100
+const range_hue_link = 125
 const min_hue_link = 75
 const mult_link_weight_stroke_width = 1
 const const_link_weight_stroke_width = 0
@@ -75,7 +75,7 @@ const padding_collision_simulation = 5
 const exp_repulsion_simulation = 2
 const mult_repulsion_simulation = 1/10000
 const exp_attraction_simulation = 1.03
-const mult_attraction_simulation = 1/10
+const mult_attraction_simulation = 1/15
 
 // zooms + views
 const mult_zoom_radius_view = 2
@@ -124,19 +124,21 @@ let links = null
 let labels = null
 let artist_names = null
 let sidebar = null
+let sidebar_selected = null
 let unlocked = null
 let locked = null
 let current_track_text = null
 let current_artist_text = null
 let current_track_link = null
 let current_track_link_text = null
+let nodes = null
 
 let results = null
 
 let links_group = svg.append("g").attr("id", "links")
 let circles_group = svg.append("g").attr("id", "circles")
 let labels_group = svg.append("g").attr("id", "labels")
-let artist_names_group = svg.append("g").attr("id", "artist_names")
+let artist_names_group = svg.append("g").attr("id", "artist_names").style("cursor", "pointer")
 let lock_group = svg.append("g").attr("id", "lock")
 
 let now_playing_group = svg.append("g").attr("id", "now_playing")
@@ -184,17 +186,43 @@ function draw() {
   current_track_link_text.attr("y", height-60).attr("x", width-225)
 }
 
+function sidebarSelectorClick(event) {
+  if (event === "genres" || event === "artists") {
+    sidebar_selected = event
+  } else {
+    node = event.target
+    sidebar_selected = node.innerHTML
+  }
+  $("#sidebar").empty()
+  if (sidebar_selected === "artists") {
+    entries = Object.entries(results.artists)
+    $("#sidebar").append(entries.map((current, i) => "<p class=\"sidebar\" style=\"cursor:default;opacity:0;font-size:" +(0.1+(current[1].popularity/10)**1.1/5)+"rem\">" + current[0] + "</p>", ""))
+    $("#sidebar-artist").addClass("sidebar-options-selected")
+    $("#sidebar-genre").removeClass("sidebar-options-selected")
+  } else {
+    $("#sidebar").append(nodes.map((current, i) => "<p class=\"sidebar\" style=\"cursor:pointer;opacity:0;font-size:" +(0.90+(current.radius/50)**1.1)+"rem\">" + current.genre + "</p>", ""))
+    $("#sidebar-artist").removeClass("sidebar-options-selected")
+    $("#sidebar-genre").addClass("sidebar-options-selected")
+  }
+  
+  sidebar = d3.selectAll("p.sidebar")
+  sidebar.transition().delay((_,i)=>20*i).duration(500).style("opacity", 1)
+  $("#sidebar p").click(sidebarClick).mouseover(sidebarMouseover).mouseout(sidebarMouseout)
+
+}
 
 
 function sidebarClick() {
-  node = event.target
-  console.log(node)
-  var id = [].indexOf.call(node.parentNode.children, node)
-  if (sim_end) {
-    selected = circles.filter((_, i) => i === id)
-    selected.transition().duration(duration_stroke_transition_zoom).style("stroke-width",0);
-    zoom(false, selected.data()[0]);
-    tip_node.direction(dir).hide(selected.data()[0]);
+  if (sidebar_selected === "genres") {
+    node = event.target
+    console.log(node)
+    var id = [].indexOf.call(node.parentNode.children, node)
+    if (sim_end) {
+      selected = circles.filter((_, i) => i === id)
+      selected.transition().duration(duration_stroke_transition_zoom).style("stroke-width",0);
+      zoom(false, selected.data()[0]);
+      tip_node.direction(dir).hide(selected.data()[0]);
+    }
   }
 
 }
@@ -203,26 +231,32 @@ function sidebarMouseover() {
   node = event.target
   node.classList.add("hover")
 
-  var id = [].indexOf.call(node.parentNode.children, node)
-  selected = circles.filter((_, i) => i === id).style("stroke-width",3).style("stroke", d3.rgb(80,80,80,0.9))
-  if (focused === svg.node()) {
+  if (sidebar_selected === "genres") {
 
-    x = selected.attr("cx")
-    y = selected.attr("cy")
-    
-    let offset_x, offset_y, dir
-    [dir, offset_x, offset_y] = chooseDirection(x, y) 
-    
-    var target = d3.select('#tipfollowscursor')
-    .attr('x', x - offset_x)
-    .attr('y', y - offset_y) // 5 pixels above the cursor
-    .node();
-    
-    tip_node.direction(dir).show(selected.data()[0], target);
-  }
-  else {
-    console.log(focused)
-    console.log(svg.node())
+    var id = [].indexOf.call(node.parentNode.children, node)
+    selected = circles.filter((_, i) => i === id).style("stroke-width",3).style("stroke", d3.rgb(80,80,80,0.9))
+    if (focused === svg.node()) {
+      
+      x = selected.attr("cx")
+      y = selected.attr("cy")
+      
+      let offset_x, offset_y, dir
+      [dir, offset_x, offset_y] = chooseDirection(x, y) 
+      
+      var target = d3.select('#tipfollowscursor')
+      .attr('x', x - offset_x)
+      .attr('y', y - offset_y) // 5 pixels above the cursor
+      .node();
+      
+      tip_node.direction(dir).show(selected.data()[0], target);
+    }
+  } else {
+    curr_artist = node.innerText
+    curr_artist_genres = results.artists[curr_artist].genres
+    selected = circles.filter((d) => curr_artist_genres.includes(d.genre)).style("stroke-width",3).style("stroke", d3.rgb(80,80,80,0.9))
+    selected_links = links.filter(d => !d.source.artists.includes(curr_artist) || !d.target.artists.includes(curr_artist))
+      .style("stroke-dasharray", "4 4").style("stroke", d3.rgb(225,225,225,0.9))
+    console.log(selected_links)
   }
   // console.log(node.innerHtml)
 }
@@ -230,11 +264,23 @@ function sidebarMouseover() {
 function sidebarMouseout() {
   node=event.target
   node.classList.remove("hover")
+  if (sidebar_selected === "genres") {
 
-  var id = [].indexOf.call(node.parentNode.children, node)
-  selected = circles.filter((_, i) => i === id).style("stroke-width",0)
-  if (focused === svg.node()) {
-    tip_node.direction(dir).hide(selected.data()[0]);
+    var id = [].indexOf.call(node.parentNode.children, node)
+    selected = circles.filter((_, i) => i === id).style("stroke-width",0)
+    if (focused === svg.node()) {
+      tip_node.hide(selected.data()[0]);
+    }
+  } else {
+    curr_artist = node.innerText
+    curr_artist_genres = results.artists[curr_artist].genres
+    selected = circles.filter((d) => curr_artist_genres.includes(d.genre)).style("stroke-width",0)
+    selected_links = links.filter(d => !d.source.artists.includes(curr_artist) || !d.target.artists.includes(curr_artist))
+      .style("stroke-dasharray", null).style("stroke", d => {
+        var amt = (max_link_weight - d.weight)/max_link_weight * range_hue_link + min_hue_link;
+        var color = d3.rgb(amt, amt, amt, 1);
+        return color
+      })
   }
 }
 
@@ -312,7 +358,7 @@ function expandZoom(circle) {
       circle.transition().delay(duration_transition_zoom*(1/5)).duration(duration_transition_zoom*(4/5))
         .attr("fill", adjust(1/brighten_expansion, current_fill))
         .on('end', () => {
-          sidebar.style("display", "none")
+          d3.select("#sidebar-general").style("display", "none")
           artist_names_group.style("display", "none")
           circle.style("stroke-width", 0)
 
@@ -328,11 +374,27 @@ function expandZoom(circle) {
       }).on('start', () => expanding = true).on('end', () => expanding = false);
 
       sidebar.transition().duration(500).style("opacity", 0)
-    } else {
       
+      svg_node = svg.node()
+      on_background = focused===svg_node
+      on_zoom = focused!==svg_node && expanded === null
+      on_expand = expanded 
+      console.log(on_zoom)
+      console.log(on_expand)
+      
+      d3.selectAll("div.zoom").transition().delay((on_zoom?1000 : 0)*resize).duration(500*resize)
+      .style("opacity", on_zoom ? 1 : 0)
+      .on("start", function() { if (on_zoom) {this.style.display = "flex"}})
+      .on("end", function() { if (!on_zoom) this.style.display = "none"; });
+
+      // d3.selectAll("div.expand").transition().delay((on_expand?1000 : 0)*resize).duration(500*resize)
+      // .style("opacity", on_expand ? 1 : 0)
+      // .on("start", function() { if (on_expand) {console.log("hi");this.style.display = "flex"}})
+      // .on("end", function() { if (!on_expand) {console.log("bye");this.style.display = "none";}}); 
+    } else {
+      expanded = null
       d3.select("#genre-page").transition().duration(500).style("row-gap", "1000px").style("opacity", 0).on('end', () => {
         d3.select("#genre-page-container").remove()
-        expanded = null
         data = circle.data()[0]
         zoomTo([data.x, data.y, data.radius*0.01])
         artist_names_group.selectAll("text")
@@ -344,11 +406,11 @@ function expandZoom(circle) {
         .on('start', () => expanding = true).on('end', () => expanding = false)
         sidebar.transition().duration(500).style("opacity", 1).on('start', () => {
           artist_names_group.style("display", "inline")
-          sidebar.style("display", "inline")
+          d3.select("#sidebar-general").style("display", "flex")
 
         })
       })
-    } 
+    }
   }
 }
 
@@ -443,17 +505,40 @@ function zoom(isBackground, orig_d, redraw=false) {
 
       return t => zoomTo(i(t));
   });
-  
+  svg_node = svg.node()
+  on_background = focused===svg_node
+  on_zoom = focused!==svg_node && expanded === null
+  already_zoom = on_zoom && focused_0!==svg_node
+  on_expand = expanded 
+  console.log(on_zoom)
   // links.transition().duration(500)
   // .style("stroke-dasharray", (d) => (d.source.index === orig_d.index) || (d.target.index === orig_d.index) ? "1" : "0")
+  d3.selectAll("div.background").transition().delay((on_background?1000 : 0)*resize).duration(500*resize)
+  .style("opacity", on_background ? 1 : 0)
+  .on("start", function() { if (on_background) {this.style.display = "flex"}})
+  .on("end", function() { if (!on_background) this.style.display = "none"; });
 
-  labels_group.selectAll("text").transition().delay(d=>(d===focused ? 1000 : 0)*resize ).duration(d => (d === focused ? 500 : 500)*resize)
+  if (already_zoom) {
+    d3.selectAll("div.zoom").transition().duration(500*resize)
+    .style("opacity", 0).on('end', function () {
+      d3.selectAll("div.zoom").transition().delay(500*resize).duration(500*resize)
+      .style("opacity",1)
+    }).on('start', function () {
+      d3.selectAll("div.zoom").style("display", "flex")
+    })
+  } else {
+    d3.selectAll("div.zoom").transition().delay((on_zoom?1000 : 0)*resize).duration(500*resize)
+    .style("opacity", on_zoom ? 1 : 0)
+    .on("start", function() { if (on_zoom) {this.style.display = "flex"}})
+    .on("end", function() { if (!on_zoom) this.style.display = "none"; });
+  }
+  labels_group.selectAll("text").transition().delay(d=>(d===focused ? 1000 : 0)*resize ).duration((500)*resize)
     .style("fill-opacity", d => d === focused ? 1 : 0)
     .on("start", function(d) { if (d === focused) {this.style.display = "block"}})
     .on("end", function(d) { if (d !== focused) this.style.display = "none"; });
 
   if (focused_0.radius || orig_d.radius) {
-    artist_names_group.selectAll("text").transition().delay((d,i)=>(d.parent===focused ? 1250+i*50 : i*50)*resize ).duration(d => (d.parent === focused ? 500 : 500)*resize)
+    artist_names_group.selectAll("text").transition().delay((d,i)=>(d.parent===focused ? 1250+i*50 : i*50)*resize ).duration((500)*resize)
     .style("fill-opacity", d => d.parent === focused ? 0.8 : 0)
     .attr("x", d => d.parent === focused ? orig_d.x : focused_0.x-focused_0.radius*0.75)
     .on("start", function(d) {if (d.parent === focused) this.style.display = "inline"; })
@@ -592,6 +677,18 @@ function show_genre_page(circle) {
   })
   $("a:contains('sound')")[0].click()
 
+  
+  svg_node = svg.node()
+  on_background = focused===svg_node
+  on_zoom = focused!==svg_node && expanded === null
+  on_expand = expanded 
+  console.log(on_zoom)
+  console.log(on_expand)
+  d3.selectAll("div.expand").transition().duration(500)
+  .style("opacity", on_expand ? 1 : 0)
+  .on("start", function() { if (on_expand) {console.log("hi");this.style.display = "flex"}})
+  .on("end", function() { if (!on_expand) {console.log("bye");this.style.display = "none";}}); 
+
 }
 
 function hide_genre_page(circle) {
@@ -607,7 +704,7 @@ d3.json("/top_genres", {method:"POST"}).then( r => {
     all_artists_top_tracks = d
   })
 
-  var nodes = results.nodes.map(d => {
+  nodes = results.nodes.map(d => {
     
     html = `<h1>${d.genre}</h1>
     <span style="display:block"><span class="grey"># of artists:</span><b> ${d.artists.length}</b></span>
@@ -694,7 +791,6 @@ d3.json("/top_genres", {method:"POST"}).then( r => {
       if (d3.event.defaultPrevented) return; // dragged
       if (sim_end) {
         if (focused !== d) {
-          console.log(d3.select(this))
           d3.select(this).transition().duration(duration_stroke_transition_zoom).style("stroke-width",0);
           zoom(false, d);
         }
@@ -762,18 +858,16 @@ d3.json("/top_genres", {method:"POST"}).then( r => {
   // .style("display", "none")
 
 
-  
-  $("#sidebar").append(nodes.map((current, i) => "<p class=\"sidebar\" style=\"opacity:0;font-size:" +(0.90+(current.radius/50)**1.1)+"rem\">" + current.genre + "</p>", ""))
 
-  $("p").click(sidebarClick).mouseover(sidebarMouseover).mouseout(sidebarMouseout)
+  $(".sidebar-options").click(sidebarSelectorClick)
+  sidebarSelectorClick("genres")
   
-  sidebar = d3.selectAll("p.sidebar")
   
-  sidebar.transition().delay((_,i)=>20*i).duration(500).style("opacity", 1)
+  
 
   sim = d3.forceSimulation(nodes)
-    .force('charge', d3.forceManyBody().distanceMax(110).strength(function (d) {
-      return -30
+    .force('charge', d3.forceManyBody().distanceMax(height/3).strength(function (d) {
+      return -150
     }))
     .force('center', d3.forceCenter(width/2, height/2))
     .force('x', d3.forceX(width/2).strength(0.015))
@@ -784,7 +878,7 @@ d3.json("/top_genres", {method:"POST"}).then( r => {
     .force("links", d3.forceLink()                               
             .id(function(d) { return d.genre; })                   
             .links(results.links)
-            // .strength(d => -(d.weight**exp_repulsion_simulation)*mult_repulsion_simulation)
+            // .strength(d => -(d.weight**exp_repulsion_simulation)*mult_repulsion_simulation/5)
             .strength(d => d.weight**exp_attraction_simulation*mult_attraction_simulation)
       )
     .on('tick', ticked)
@@ -868,7 +962,7 @@ function expand(current, d) {
 }
 function adjust(k, color) {
 
-  console.log(color)
+  // console.log(color)
   let new_c = d3.rgb(
     r= (255-(255-color.r)*k),
     g= (255-(255-color.g)*k),
@@ -879,7 +973,7 @@ function adjust(k, color) {
   //   g= color.g*k,
   //   b= color.b*k,
   // );
-  console.log(new_c)
+  // console.log(new_c)
   return new_c
 }
 
@@ -905,7 +999,6 @@ Handlebars.registerHelper("url", function(artist) {
 
 Handlebars.registerHelper("make-bars", function (artist) {
   filled = Math.round(results.artists[artist].popularity/10)
-  console.log(filled)
   acc = ""
   for (var index = 0; index < 10; index ++) {
     if (index < filled) {

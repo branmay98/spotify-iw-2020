@@ -27,7 +27,7 @@ files = glob.glob('cache/*')
 for f in files:
     os.remove(f)
 
-with open("./static/genre_playlists_popularity_artists_test.p", "rb") as fp:
+with open("./static/genre_playlists_popularity_artists.p", "rb") as fp:
     genre_playlists_popularity_artists = pickle.load(fp)
 with open("./static/genreList.p", "rb") as fp:
     all_genres = pickle.load(fp)
@@ -55,8 +55,11 @@ def top_genres():
                             artist_dict[artist_name]["image"] = image["url"]
                             break
                     else:
-                        print('bye')
-                        artist_dict[artist_name]["image"] = artist["images"][-1]["url"]
+                        try:
+                            artist_dict[artist_name]["image"] = artist["images"][-1]["url"]
+                        except IndexError as e:
+                            artist_dict[artist_name]["image"] = ""
+                            print(e)
                     artist_dict[artist_name]["genres"] = artist["genres"]
                     artist_dict[artist_name]["uri"] = artist["uri"]
                     artist_dict[artist_name]["popularity"] = artist["popularity"]
@@ -127,7 +130,11 @@ def top_genres():
 
     total_artist_pop_r = {item: rank + 1 for rank, item in gen(total_artist_pop)}
     average_artist_pop_r = {item: rank + 1 for rank, item in gen(average_artist_pop)}
-
+    
+    # for node in node_data:
+    #     print(node["genre"])
+    #     print(genre_playlists_popularity_artists[node["genre"]])
+    #     print(genre_playlists_popularity_artists[node["genre"]]["playlists"])
     new_node_data = [ 
         {
             "centrality": {
