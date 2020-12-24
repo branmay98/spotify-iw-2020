@@ -1,4 +1,3 @@
-
 from bs4 import BeautifulSoup
 import requests, sys
 from collections import defaultdict
@@ -28,9 +27,6 @@ r = requests.get("http://everynoise.com/engenremap.html")
 ## Parse Genre HTML Elements
 soup = BeautifulSoup(r.text,"html.parser")
 allGenreDivs = soup.find_all("div", "genre scanme")
-
-
-genreCnt = 0
 
 for i, div in enumerate(allGenreDivs):
     
@@ -66,7 +62,6 @@ for i, div in enumerate(allGenreDivs):
         artistName = str.strip(artist.getText())[:-1]
         if not(artistName.isspace()):
             genre_metadata[genre]["artists"].append(artistName) 
-    genreCnt = genreCnt+1
 
 print ("There are " + str(len(genre_metadata)) + " genres")
 
@@ -77,3 +72,88 @@ for genre in genre_metadata:
 with open("../static/genre_playlists_popularity_artists.p", "wb") as fp:
     pickle.dump(genre_metadata, fp)
 
+
+## Cycle through genres and go to that genres page
+# %%
+genreList = defaultdict(list)
+genreCnt = 0
+for genreDiv in allGenreDivs:
+    print("Pulling genre #" + str(genreCnt))
+    sys.stdout.flush()
+        
+    genre = str.strip(genreDiv.getText())[:-1]
+    genrePage = "http://everynoise.com/" + genreDiv.find_next("a")["href"]
+
+    ## Pull artists from genre page
+    r2 = requests.get(genrePage)
+    soup2 = BeautifulSoup(r2.text,"html.parser")
+    allArtistDivs = soup2.find_all("div", "genre scanme")
+
+    for artist in allArtistDivs:
+        artistName = str.strip(artist.getText())[:-1]
+        if not(artistName.isspace()):
+            genreList[genre].append(artistName) 
+    genreCnt = genreCnt+1
+
+with open('../static/genreList.p', 'wb') as fp:
+    pickle.dump(genreList, fp)
+
+print ("There are " + str(len(genreList)) + " genres")
+
+
+# %%
+## Make artist list
+artistList = defaultdict(list)
+for genre in genreList:
+    artists = genreList[genre]
+    for a in artists:
+        artistList[a].append(genre)
+        
+print ("There are " + str(len(artistList)) + " artists")
+
+
+# %%
+# alphebetize lists, remove redundancies
+for artist in artistList:
+    artistList[artist] = sorted(list(set(artistList[artist])))
+
+for genre in genreList:
+    genreList[genre] = sorted(list(set(genreList[genre])))
+
+
+# %%
+artists = None 
+artists = list()
+genres = list()
+
+for artist in artistList:
+    artists.append(artist)
+artists.sort()
+
+for genre in genreList:
+    genres.append(genre)
+genres.sort()
+
+
+# %%
+## save data for HTML processing
+
+with open('../static/artistList.p', 'wb') as fp:
+    pickle.dump(artistList, fp)
+
+with open('../static/genreList.p', 'wb') as fp:
+    pickle.dump(genreList, fp)
+    
+with open('../static/artists.p', 'wb') as fp:
+    pickle.dump(artists, fp)
+
+with open('../static/genres.p', 'wb') as fp:
+    pickle.dump(genres, fp)
+
+# %%
+
+with open("../static/genreList.p", 'rb') as fp:
+    
+    print(sorted([(name, len(val)) for name, val in pickle.load(fp).items()], key=lambda d: -d[1])[:100])
+
+# %%
