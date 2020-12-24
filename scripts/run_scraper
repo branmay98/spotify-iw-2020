@@ -1,3 +1,4 @@
-rm ../static/*.p
+cd scripts
+rm -rf ../static/*.p
 python ../scraper/new_scraper.py
 
